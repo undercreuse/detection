@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@techstark/opencv-js": "^4.10.0-release.1",
     "autoprefixer": "^10.4.20",
     "axios": "^1.7.9",
     "cra-template": "1.2.0",
     "lucide-react": "^0.473.0",
+    "opencv.js": "^1.2.1",
+    "path-browserify": "^1.0.1",
     "postcss": "^8.5.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
@@ -17,11 +18,11 @@
     "tailwindcss": "^3.4.17"
   },
   "scripts": {
-    "start-secure": "HOST=192.168.1.51 HTTPS=true SSL_CRT_FILE=localhost.pem SSL_KEY_FILE=localhost-key.pem react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start-secure": "HOST=192.168.1.51 HTTPS=true SSL_CRT_FILE=localhost.pem SSL_KEY_FILE=localhost-key.pem react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
     "eject": "react-scripts eject",
-    "start": "react-scripts start"
+    "start": "react-app-rewired start"
   },
   "eslintConfig": {
     "extends": [
@@ -40,5 +41,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "react-app-rewired": "^2.2.1"
   }
 }
