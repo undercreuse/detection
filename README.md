@@ -1,14 +1,44 @@
-# Getting Started with Create React App
+# Application de Détection Simple
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Cette application est une version simple et fonctionnelle d'un système de détection de formes. Cette version représente l'état stable de l'application avant l'ajout du viseur.
 
-## Available Scripts
+## Fonctionnalités
 
-In the project directory, you can run:
+- Interface utilisateur simple et intuitive
+- Détection de formes basique
+- Application React optimisée pour les performances
+
+## Installation
+
+1. Cloner le repository
+```bash
+git clone https://github.com/undercreuse/detection.git
+cd detection
+```
+
+2. Installer les dépendances
+```bash
+npm install
+```
+
+3. Lancer l'application
+```bash
+npm start
+```
+
+L'application sera accessible à l'adresse [http://localhost:3000](http://localhost:3000).
+
+## Technologies utilisées
+
+- React.js
+- Tailwind CSS
+- Node.js
+
+## Scripts disponibles
 
 ### `npm start`
 
-Runs the app in the development mode.\
+Lance l'application en mode développement.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 The page will reload when you make changes.\
@@ -21,7 +51,7 @@ See the section about [running tests](https://facebook.github.io/create-react-ap
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
+Crée une version optimisée pour la production.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
 The build is minified and the filenames include the hashes.\

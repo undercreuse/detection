@@ -10,43 +10,68 @@ class PatternDetectionService {
   }
 
   async preprocessImage(imageMat) {
+    // Conversion en niveaux de gris
     const gray = new cv.Mat();
     cv.cvtColor(imageMat, gray, cv.COLOR_RGBA2GRAY);
 
+    // Réduction du bruit
     const blurred = new cv.Mat();
     cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
 
-    const binary = new cv.Mat();
-    cv.threshold(blurred, binary, 127, 255, cv.THRESH_BINARY);
+    // Détection des contours avec Canny
+    const edges = new cv.Mat();
+    cv.Canny(blurred, edges, 50, 150, 3);
 
+    // Libération de la mémoire
     gray.delete();
     blurred.delete();
 
-    return binary;
+    return edges;
+  }
+
+  async detectFeatures(imageMat) {
+    // Création du détecteur ORB
+    const orb = new cv.ORB(500);
+    const keypoints = new cv.KeyPointVector();
+    const descriptors = new cv.Mat();
+
+    // Détection et calcul des descripteurs
+    orb.detect(imageMat, keypoints);
+    orb.compute(imageMat, keypoints, descriptors);
+
+    return { keypoints, descriptors };
   }
 
   async compareImages(queryImage, referenceImage) {
     try {
+      // Prétraitement des images
       const processedQuery = await this.preprocessImage(queryImage);
       const processedRef = await this.preprocessImage(referenceImage);
 
-      // Calcul de la différence absolue
-      const diff = new cv.Mat();
-      cv.absdiff(processedQuery, processedRef, diff);
+      // Extraction des caractéristiques
+      const queryFeatures = await this.detectFeatures(processedQuery);
+      const refFeatures = await this.detectFeatures(processedRef);
 
-      // Calcul du score de similarité
-      const totalPixels = diff.rows * diff.cols;
-      const differentPixels = cv.countNonZero(diff);
-      const similarityScore = 1 - (differentPixels / totalPixels);
+      // Matching des caractéristiques
+      const matcher = new cv.BFMatcher(cv.NORM_HAMMING, true);
+      const matches = matcher.match(queryFeatures.descriptors, refFeatures.descriptors);
+
+      // Filtrage des bons matches
+      const goodMatches = matches.filter(match => match.distance < 50);
+      const matchScore = goodMatches.length / matches.length;
 
       // Nettoyage
       processedQuery.delete();
       processedRef.delete();
-      diff.delete();
+      queryFeatures.keypoints.delete();
+      queryFeatures.descriptors.delete();
+      refFeatures.keypoints.delete();
+      refFeatures.descriptors.delete();
 
       return {
-        score: similarityScore,
-        isMatch: similarityScore > 0.8
+        score: matchScore,
+        matches: goodMatches.length,
+        isMatch: matchScore > 0.4
       };
     } catch (error) {
       console.error('Erreur lors de la comparaison:', error);
