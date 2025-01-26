@@ -227,21 +227,7 @@ const ObjectDetectionApp = () => {
             />
           </div>
           <div className="flex space-x-2">
-            <button
-              onClick={captureImage}
-              disabled={isProcessing || !patternService}
-              className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
-            >
-              {isProcessing ? (
-                <Scan className="w-8 h-8 animate-spin" />
-              ) : !patternService ? (
-                <div className="flex items-center space-x-2">
-                  <Scan className="w-8 h-8 animate-pulse" />
-                </div>
-              ) : (
-                <Camera className="w-8 h-8" />
-              )}
-            </button>
+            
             {capturedImage && (
               <button
                 onClick={handleComparison}
@@ -260,14 +246,7 @@ const ObjectDetectionApp = () => {
             >
               <QrCode className="w-6 h-6 text-white hover:text-primary-lighter" />
             </button>
-            <button
-              onClick={testImageComparison}
-              className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-white hover:text-primary-lighter">
-                <path d="M12 10v6m0 0l-3-3m3 3l3-3m-3 3H9m0 0a9 9 0 110-18 9 9 0 010 18z"/>
-              </svg>
-            </button>
+            
           </div>
         </div>
 
@@ -399,63 +378,83 @@ const ObjectDetectionApp = () => {
                 </svg>
               </button>
               <h2 className="text-xl font-bold mb-4">Comparaison d'Images</h2>
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border p-2">Image Source</th>
-                    <th className="border p-2">Image Capturée</th>
-                    <th className="border p-2">Image Comparée</th>
-                    <th className="border p-2">Informations de Comparaison</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonData.length > 0 ? (
-                    comparisonData.map((item, index) => {
-                      // Extraire le nom du fichier de manière sécurisée
-                      const sourceImageName = typeof item.sourceImage === 'string' 
-                        ? item.sourceImage.split('/').pop() 
-                        : `unum${index + 1}.png`;
-
-                      return (
-                        <tr key={index}>
-                          <td className="border p-2 text-center">
-                            <img 
-                              src={`/images-source/${sourceImageName}`} 
-                              alt="Source" 
-                              className="mx-auto max-h-32 max-w-full object-contain"
-                            />
-                          </td>
-                          <td className="border p-2 text-center">
-                            {item.capturedImage && (
-                              <img 
-                                src={item.capturedImage} 
-                                alt="Capturée" 
-                                className="mx-auto max-h-32 max-w-full object-contain"
-                              />
-                            )}
-                          </td>
-                          <td className="border p-2 text-center">
-                            {item.comparisonImageDataUrl && (
-                              <img 
-                                src={item.comparisonImageDataUrl} 
-                                alt="Comparaison" 
-                                className="mx-auto max-h-32 max-w-full object-contain"
-                              />
-                            )}
-                          </td>
-                          <td className="border p-2 text-center">
-                            {item.comparisonInfo}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
+              <div className="max-h-[70vh] overflow-y-auto">
+                <table className="w-[90%] mx-auto border-collapse border border-gray-300">
+                  <thead className="sticky top-0 bg-gray-100 z-10">
                     <tr>
-                      <td colSpan={4} className="border p-2 text-center">Aucune comparaison trouvée</td>
+                      <th className="border p-2">Image Source</th>
+                      <th className="border p-2">Image Capturée</th>
+                      <th className="border p-2">Image Comparée</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {comparisonData.length > 0 ? (
+                      comparisonData.map((item, index) => {
+                        // Extraire le nom du fichier de manière sécurisée
+                        const sourceImageName = typeof item.sourceImage === 'string' 
+                          ? item.sourceImage.split('/').pop() 
+                          : `unum${index + 1}.png`;
+
+                        // Trouver l'index de l'élément avec la plus grande similarité
+                        const maxSimilarityIndex = comparisonData.reduce((maxIndex, currentItem, currentIndex) => 
+                          parseFloat(currentItem.similarity) > parseFloat(comparisonData[maxIndex].similarity) 
+                            ? currentIndex 
+                            : maxIndex, 0);
+
+                        return (
+                          <>
+                            <tr 
+                              key={index} 
+                              className={index === maxSimilarityIndex 
+                                ? 'bg-[#8caa77]' 
+                                : ''}
+                            >
+                              <td className="border p-2 text-center">
+                                <img 
+                                  src={`/images-source/${sourceImageName}`} 
+                                  alt="Source" 
+                                  className="mx-auto max-h-32 max-w-full object-contain"
+                                />
+                              </td>
+                              <td className="border p-2 text-center">
+                                {item.capturedImage && (
+                                  <img 
+                                    src={item.capturedImage} 
+                                    alt="Capturée" 
+                                    className="mx-auto max-h-32 max-w-full object-contain"
+                                  />
+                                )}
+                              </td>
+                              <td className="border p-2 text-center">
+                                {item.comparisonImageDataUrl && (
+                                  <img 
+                                    src={item.comparisonImageDataUrl} 
+                                    alt="Comparaison" 
+                                    className="mx-auto max-h-32 max-w-full object-contain"
+                                  />
+                                )}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className={`border p-2 ${index === maxSimilarityIndex ? 'bg-[#8caa77]' : ''}`}>
+                                <div className={`flex flex-col items-start space-y-1 ${index === maxSimilarityIndex ? 'text-white' : ''}`}>
+                                  <span>Correspondance : {item.correspondance} points</span>
+                                  <span>Similitude : {item.similarity}%</span>
+                                  <span>{item.comparisonInfo}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="border p-2 text-center">Aucune comparaison trouvée</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

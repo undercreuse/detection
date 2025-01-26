@@ -19,11 +19,8 @@
     <script>
       // Configuration globale pour OpenCV
       var Module = {
-        onRuntimeInitialized() {
-          console.log('OpenCV Runtime initialisé');
-          if (window.onOpenCvReady) {
-            window.onOpenCvReady();
-          }
+        onRuntimeInitialized: function() {
+          console.log('OpenCV Runtime initialisé (index.html)');
         }
       };
     </script>
@@ -31,6 +28,8 @@
       src="%PUBLIC_URL%/opencv.js" 
       async 
       defer
+      onload="console.log('OpenCV.js chargé (index.html)')"
+      onerror="console.error('Erreur de chargement OpenCV.js (index.html)')"
     ></script>
   </head>
   <body>

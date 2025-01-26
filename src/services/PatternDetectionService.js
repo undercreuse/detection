@@ -2,9 +2,16 @@
 import React from 'react';
 
 export default class PatternDetectionService {
+    static instance = null;
+    static isInitializing = false;
+    static opencvLoaded = false;
+    static opencvLoadPromise = null;
+
     constructor() {
-        console.log("PatternDetectionService initialisé");
-        
+        if (PatternDetectionService.instance) {
+            return PatternDetectionService.instance;
+        }
+
         this.sourceImages = [
             '/images-source/unum1.png',
             '/images-source/unum2.png', 
@@ -14,74 +21,84 @@ export default class PatternDetectionService {
         this.logoTemplate = null;
         this.isReady = false;
         
-        // Charger OpenCV
-        this.loadOpenCV();
+        PatternDetectionService.instance = this;
+        
+        // Charger OpenCV une seule fois
+        this.initializeOpenCVOnce();
     }
 
-    loadOpenCV() {
-        // Vérifier si OpenCV est déjà chargé
-        if (typeof cv !== 'undefined' && cv.Mat) {
-            console.log('OpenCV déjà chargé');
-            this.initLogoTemplate();
+    static getInstance() {
+        if (!PatternDetectionService.instance) {
+            PatternDetectionService.instance = new PatternDetectionService();
+        }
+        return PatternDetectionService.instance;
+    }
+
+    async initializeOpenCVOnce() {
+        // Si déjà chargé, retourner immédiatement
+        if (PatternDetectionService.opencvLoaded) {
+            await this.initLogoTemplate();
             return;
         }
 
-        // Vérifier si le script OpenCV est déjà en cours de chargement
-        const existingScript = document.querySelector('script[src="/opencv.js"]');
-        if (existingScript) {
-            console.log('Script OpenCV déjà en cours de chargement');
-            
-            // Ajouter un écouteur d'événement pour détecter le chargement
-            existingScript.addEventListener('load', () => {
-                console.log('Script OpenCV chargé via écouteur');
-                this.initializeOpenCVRuntime();
-            });
-            return;
+        // Si un chargement est en cours, attendre
+        if (PatternDetectionService.opencvLoadPromise) {
+            return PatternDetectionService.opencvLoadPromise;
         }
 
-        // Ajouter un script pour charger OpenCV dynamiquement
-        const script = document.createElement('script');
-        script.src = '/opencv.js';
-        script.async = true;
-        script.onload = () => {
-            console.log('Script OpenCV chargé');
-            this.initializeOpenCVRuntime();
-        };
-        script.onerror = () => {
-            console.error('Erreur de chargement du script OpenCV');
-        };
-        document.head.appendChild(script);
-
-        // Timeout de sécurité
-        setTimeout(() => {
-            if (!this.isReady) {
-                console.error('OpenCV non chargé après 10 secondes');
+        // Nouvelle promesse de chargement
+        PatternDetectionService.opencvLoadPromise = new Promise((resolve, reject) => {
+            // Vérifier si OpenCV est déjà disponible
+            if (typeof cv !== 'undefined' && cv.Mat) {
+                console.log('OpenCV déjà disponible');
+                PatternDetectionService.opencvLoaded = true;
+                this.initLogoTemplate().then(resolve).catch(reject);
+                return;
             }
-        }, 10000);
-    }
 
-    initializeOpenCVRuntime() {
-        // Configuration du module OpenCV
-        if (!window.Module) {
-            window.Module = {};
-        }
+            // Configuration du module OpenCV avant le chargement
+            window.Module = window.Module || {};
+            window.Module.onRuntimeInitialized = () => {
+                console.log('OpenCV Runtime initialisé');
+                
+                // Vérifier la disponibilité de cv
+                const checkOpenCVReady = () => {
+                    if (typeof cv !== 'undefined' && cv.Mat) {
+                        PatternDetectionService.opencvLoaded = true;
+                        this.initLogoTemplate()
+                            .then(() => resolve())
+                            .catch(reject);
+                    } else {
+                        setTimeout(checkOpenCVReady, 100);
+                    }
+                };
 
-        window.Module.onRuntimeInitialized = () => {
-            console.log('OpenCV Runtime initialisé');
-            
-            // Vérifier la disponibilité de cv
-            const checkOpenCVReady = () => {
-                if (typeof cv !== 'undefined' && cv.Mat) {
-                    console.log('OpenCV prêt');
-                    this.initLogoTemplate();
-                } else {
-                    console.warn('OpenCV pas encore prêt');
-                    setTimeout(checkOpenCVReady, 100);
-                }
+                checkOpenCVReady();
             };
 
-            checkOpenCVReady();
-        };
+            // Supprimer tous les scripts OpenCV existants
+            document.querySelectorAll('script[src*="opencv.js"]').forEach(script => script.remove());
+
+            // Charger le script OpenCV
+            const script = document.createElement('script');
+            script.src = '/opencv/opencv.js';  // Chemin corrigé
+            script.async = true;
+            script.onerror = (error) => {
+                console.error('Erreur de chargement du script OpenCV', error);
+                reject(error);
+            };
+            document.head.appendChild(script);
+
+            // Timeout de sécurité
+            const loadTimeout = setTimeout(() => {
+                if (!PatternDetectionService.opencvLoaded) {
+                    console.error('OpenCV non chargé après 15 secondes');
+                    reject(new Error('Chargement de OpenCV timeout'));
+                }
+            }, 15000);
+        });
+
+        return PatternDetectionService.opencvLoadPromise;
     }
 
     async initLogoTemplate() {
@@ -261,8 +278,9 @@ export default class PatternDetectionService {
                             sourceImage: sourceImagePath,
                             capturedImage: capturedImageDataUrl,
                             comparisonImageDataUrl: comparisonCanvas.toDataURL('image/jpeg'),
-                            similarityScore: similarityScore,
-                            comparisonInfo: `Similarité : ${(similarityScore * 100).toFixed(2)}% (${goodMatches.length} correspondances)`
+                            comparisonInfo: `Similarité : ${(similarityScore * 100).toFixed(2)}% (${goodMatches.length} correspondances)`,
+                            correspondance: goodMatches.length,
+                            similarity: (similarityScore * 100).toFixed(2)
                         });
 
                         // Libérer la mémoire
