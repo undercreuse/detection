@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Scan, QrCode } from 'lucide-react';
+import { Camera, Scan } from 'lucide-react';
 import logo from './logo.png';
-import { QRCodeCanvas } from 'qrcode.react';
 import PatternDetectionService from './services/PatternDetectionService';
 
 const ObjectDetectionApp = () => {
   const [capturedImage, setCapturedImage] = useState(null);
   const [analysisResults, setAnalysisResults] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showQR, setShowQR] = useState(false);
   const [patternService, setPatternService] = useState(null);
   const [comparisonResult, setComparisonResult] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,9 +16,6 @@ const ObjectDetectionApp = () => {
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-
-  // URL actuelle de l'application
-  const appUrl = window.location.href.replace('localhost', window.location.hostname);
 
   useEffect(() => {
     const service = new PatternDetectionService();
@@ -45,15 +40,6 @@ const ObjectDetectionApp = () => {
       }
     };
   }, []);
-
-  const handleVideoMetadata = () => {
-    if (videoRef.current) {
-      setVideoSize({
-        width: videoRef.current.videoWidth,
-        height: videoRef.current.videoHeight
-      });
-    }
-  };
 
   const startCamera = async () => {
     try {
@@ -135,10 +121,6 @@ const ObjectDetectionApp = () => {
     }
   };
 
-  const toggleQR = () => {
-    setShowQR(!showQR);
-  };
-
   const handleComparison = async () => {
     console.log("Démarrage de la comparaison d'images");
     console.log("Image capturée :", capturedImage ? capturedImage.substring(0, 50) + '...' : 'Pas d\'image');
@@ -196,21 +178,23 @@ const ObjectDetectionApp = () => {
     }
   };
 
-  // Calculer les dimensions du rectangle de cadrage
   const getCropGuideStyle = () => {
     if (!videoSize.width || !videoSize.height) return {};
-
-    // Dimensions basées sur la hauteur pour maintenir le ratio 1:3
-    const width = videoSize.height * 0.267;
-    const height = width * 3;
-    const left = (videoSize.width - width) / 2;
-    const top = (videoSize.height - height) / 2;
+    
+    const videoWidth = videoSize.width;
+    const videoHeight = videoSize.height;
+    const captureWidth = videoHeight * 0.267;
+    const captureHeight = captureWidth * 3;
 
     return {
-      left: `${(left / videoSize.width) * 100}%`,
-      top: `${(top / videoSize.height) * 100}%`,
-      width: `${(width / videoSize.width) * 100}%`,
-      height: `${(height / videoSize.height) * 100}%`
+      position: 'absolute',
+      top: `${(videoHeight - captureHeight) / 2}px`,
+      left: `${(videoWidth - captureWidth) / 2}px`,
+      width: `${captureWidth}px`,
+      height: `${captureHeight}px`,
+      border: '2px solid rgba(255, 255, 255, 0.5)',
+      pointerEvents: 'none',
+      zIndex: 10
     };
   };
 
@@ -228,10 +212,19 @@ const ObjectDetectionApp = () => {
           </div>
           <div className="flex space-x-2">
             <button
-              onClick={toggleQR}
+              onClick={captureImage}
+              disabled={isProcessing || !patternService}
               className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
             >
-              <QrCode className="w-6 h-6 text-white hover:text-primary-lighter" />
+              {isProcessing ? (
+                <Scan className="w-8 h-8 animate-spin" />
+              ) : !patternService ? (
+                <div className="flex items-center space-x-2">
+                  <Scan className="w-8 h-8 animate-pulse" />
+                </div>
+              ) : (
+                <Camera className="w-8 h-8" />
+              )}
             </button>
             {capturedImage && (
               <button
@@ -368,33 +361,6 @@ const ObjectDetectionApp = () => {
             </div>
           )}
         </div>
-
-        {/* Modal QR Code */}
-        {showQR && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-               onClick={toggleQR}>
-            <div className="bg-white p-6 rounded-lg relative" onClick={e => e.stopPropagation()}>
-              <button 
-                onClick={toggleQR} 
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-              <div className="text-center mb-4">
-                <h3 className="font-bold text-lg text-primary">Scanner pour iPhone</h3>
-                <p className="text-sm text-gray-600">Ouvrez l'appareil photo de votre iPhone et scannez ce QR code</p>
-              </div>
-              <QRCodeCanvas 
-                value={appUrl}
-                size={200}
-                level="H"
-              />
-            </div>
-          </div>
-        )}
 
         {/* Modal Comparaison d'Images */}
         {showComparison && (
