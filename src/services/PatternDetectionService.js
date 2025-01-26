@@ -1,7 +1,13 @@
 class PatternDetectionService {
   constructor() {
     console.log('Initializing PatternDetectionService');
-    this.sourceImages = [];
+    this.sourceImages = [
+      '/images-source/unum1.png',
+      '/images-source/unum2.png', 
+      '/images-source/unum3.png', 
+      '/images-source/unum4.png'
+    ];
+    console.log("Chemins des images sources :", this.sourceImages);
     this.isInitialized = false;
     this.initPromise = null;
     this.initialize();
@@ -39,17 +45,10 @@ class PatternDetectionService {
   }
 
   async loadSourceImages() {
-    const sourceUrls = [
-      '/images-source/unum1.png',
-      '/images-source/unum2.png',
-      '/images-source/unum3.png',
-      '/images-source/unum4.png'
-    ];
-
     try {
       this.sourceImages = await Promise.all(
-        sourceUrls.map(async (url, index) => {
-          console.log(`Loading image ${index + 1}/${sourceUrls.length}: ${url}`);
+        this.sourceImages.map(async (url, index) => {
+          console.log(`Loading image ${index + 1}/${this.sourceImages.length}: ${url}`);
           const response = await fetch(url);
           if (!response.ok) {
             throw new Error(`Failed to load image: ${url}`);
@@ -256,6 +255,111 @@ class PatternDetectionService {
   calculateConfidence(matchCount, keypointCount) {
     const ratio = matchCount / keypointCount;
     return Math.min(ratio * 2, 1);
+  }
+
+  async compareImages(capturedImageDataUrl) {
+    console.log("Début de compareImages avec l'image :", capturedImageDataUrl ? capturedImageDataUrl.substring(0, 50) + '...' : 'Pas d\'image');
+    
+    if (!capturedImageDataUrl) {
+      console.error("Aucune image capturée");
+      return [];
+    }
+
+    const comparisons = [];
+
+    try {
+      console.log("Début de la boucle de comparaison");
+      for (const sourceImagePath of this.sourceImages) {
+        console.log("Tentative de comparaison avec l'image source :", sourceImagePath);
+        
+        try {
+          console.log(`Début de compareImagePair pour ${sourceImagePath}`);
+          const comparisonResult = await this.compareImagePair(sourceImagePath, capturedImageDataUrl);
+          console.log(`Résultat de compareImagePair pour ${sourceImagePath} :`, comparisonResult);
+          comparisons.push(comparisonResult);
+        } catch (pairComparisonError) {
+          console.error(`Erreur lors de la comparaison avec ${sourceImagePath}:`, pairComparisonError);
+          
+          // Générer un résultat par défaut en cas d'erreur
+          comparisons.push({
+            sourceImage: sourceImagePath, // Utiliser directement le chemin
+            capturedImage: capturedImageDataUrl || null,
+            comparisonImageDataUrl: null,
+            similarityScore: 0,
+            comparisonInfo: 'Comparaison impossible'
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erreur globale lors de la comparaison des images :", error);
+    }
+
+    console.log("Nombre de comparaisons effectuées :", comparisons.length);
+    return comparisons;
+  }
+
+  async compareImagePair(sourceImagePath, capturedImageDataUrl) {
+    return new Promise((resolve, reject) => {
+      const sourceImage = new Image();
+      const capturedImage = new Image();
+
+      sourceImage.crossOrigin = 'Anonymous';
+      capturedImage.crossOrigin = 'Anonymous';
+
+      sourceImage.onerror = (e) => {
+        console.error("Erreur de chargement de l'image source :", e, sourceImagePath);
+        reject(e);
+      };
+
+      capturedImage.onerror = (e) => {
+        console.error("Erreur de chargement de l'image capturée :", e);
+        reject(e);
+      };
+
+      sourceImage.onload = () => {
+        console.log("Image source chargée avec succès");
+        capturedImage.onload = () => {
+          console.log("Image capturée chargée avec succès");
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Redimensionner les images à la même taille
+          canvas.width = Math.min(sourceImage.width, capturedImage.width);
+          canvas.height = Math.min(sourceImage.height, capturedImage.height);
+
+          // Dessiner les images sur le canvas
+          ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+          ctx.globalAlpha = 0.5;
+          ctx.drawImage(capturedImage, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+
+          // Calculer une métrique de similarité simple
+          const comparisonImageDataUrl = canvas.toDataURL('image/jpeg');
+          const similarityScore = this.calculateSimilarityScore(sourceImage, capturedImage);
+
+          resolve({
+            sourceImage: sourceImagePath, // Utiliser directement le chemin
+            capturedImage: capturedImageDataUrl,
+            comparisonImageDataUrl: comparisonImageDataUrl,
+            similarityScore: similarityScore,
+            comparisonInfo: `Similarité : ${(similarityScore * 100).toFixed(2)}%`
+          });
+        };
+        capturedImage.src = capturedImageDataUrl;
+      };
+      
+      // Charger l'image source avec le chemin complet
+      const fullSourcePath = window.location.origin + sourceImagePath;
+      console.log(`Chargement de l'image source à partir de :`, fullSourcePath);
+      sourceImage.src = fullSourcePath;
+    });
+  }
+
+  calculateSimilarityScore(img1, img2) {
+    // Une méthode simple de calcul de similarité basée sur les dimensions
+    const widthSimilarity = 1 - Math.abs(img1.width - img2.width) / Math.max(img1.width, img2.width);
+    const heightSimilarity = 1 - Math.abs(img1.height - img2.height) / Math.max(img1.height, img2.height);
+    
+    return (widthSimilarity + heightSimilarity) / 2;
   }
 }
 

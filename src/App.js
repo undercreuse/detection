@@ -11,6 +11,8 @@ const ObjectDetectionApp = () => {
   const [showQR, setShowQR] = useState(false);
   const [isServiceReady, setIsServiceReady] = useState(false);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonData, setComparisonData] = useState([]);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -26,6 +28,15 @@ const ObjectDetectionApp = () => {
     }, 1000);
 
     return () => clearInterval(checkServiceStatus);
+  }, []);
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
 
   const handleVideoMetadata = () => {
@@ -121,14 +132,27 @@ const ObjectDetectionApp = () => {
     setShowQR(!showQR);
   };
 
-  React.useEffect(() => {
-    startCamera();
-    return () => {
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+  const handleComparison = async () => {
+    console.log("Démarrage de la comparaison d'images");
+    console.log("Image capturée :", capturedImage ? capturedImage.substring(0, 50) + '...' : 'Pas d\'image');
+    
+    if (capturedImage) {
+      try {
+        console.log("Appel de PatternDetectionService.compareImages()");
+        const comparisons = await PatternDetectionService.compareImages(capturedImage);
+        console.log("Comparaisons reçues :", comparisons);
+        
+        setComparisonData(comparisons);
+        setShowComparison(true);
+      } catch (error) {
+        console.error("Erreur lors de la comparaison :", error);
+        alert('Erreur lors de la comparaison des images : ' + error.message);
       }
-    };
-  }, []);
+    } else {
+      console.warn("Pas d'image capturée");
+      alert('Veuillez d\'abord capturer une image');
+    }
+  };
 
   // Calculer les dimensions du rectangle de cadrage
   const getCropGuideStyle = () => {
@@ -151,7 +175,7 @@ const ObjectDetectionApp = () => {
   return (
     <div className="min-h-screen bg-primary-darker flex items-center justify-center p-4">
       <div className="bg-primary w-full max-w-sm h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        {/* En-tête avec logo et bouton QR */}
+        {/* En-tête avec logo et boutons */}
         <div className="p-4 bg-primary-light flex justify-between items-center">
           <div className="h-12 flex items-center">
             <img 
@@ -160,12 +184,26 @@ const ObjectDetectionApp = () => {
               className="h-full w-auto object-contain"
             />
           </div>
-          <button
-            onClick={toggleQR}
-            className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
-          >
-            <QrCode className="w-6 h-6 text-white hover:text-primary-lighter" />
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={toggleQR}
+              className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
+            >
+              <QrCode className="w-6 h-6 text-white hover:text-primary-lighter" />
+            </button>
+            {capturedImage && (
+              <button
+                onClick={handleComparison}
+                className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-white hover:text-primary-lighter">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <path d="M11 12 L13 14 L16 11"/>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Zone de la caméra */}
@@ -285,7 +323,16 @@ const ObjectDetectionApp = () => {
         {showQR && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
                onClick={toggleQR}>
-            <div className="bg-white p-6 rounded-lg" onClick={e => e.stopPropagation()}>
+            <div className="bg-white p-6 rounded-lg relative" onClick={e => e.stopPropagation()}>
+              <button 
+                onClick={toggleQR} 
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
               <div className="text-center mb-4">
                 <h3 className="font-bold text-lg text-primary">Scanner pour iPhone</h3>
                 <p className="text-sm text-gray-600">Ouvrez l'appareil photo de votre iPhone et scannez ce QR code</p>
@@ -295,6 +342,82 @@ const ObjectDetectionApp = () => {
                 size={200}
                 level="H"
               />
+            </div>
+          </div>
+        )}
+
+        {/* Modal Comparaison d'Images */}
+        {showComparison && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+               onClick={() => setShowComparison(false)}>
+            <div className="bg-white p-6 rounded-lg max-w-4xl w-full relative" onClick={e => e.stopPropagation()}>
+              <button 
+                onClick={() => setShowComparison(false)} 
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+              <h2 className="text-xl font-bold mb-4">Comparaison d'Images</h2>
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border p-2">Image Source</th>
+                    <th className="border p-2">Image Capturée</th>
+                    <th className="border p-2">Image Comparée</th>
+                    <th className="border p-2">Informations de Comparaison</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonData.length > 0 ? (
+                    comparisonData.map((item, index) => {
+                      // Extraire le nom du fichier de manière sécurisée
+                      const sourceImageName = typeof item.sourceImage === 'string' 
+                        ? item.sourceImage.split('/').pop() 
+                        : `unum${index + 1}.png`;
+
+                      return (
+                        <tr key={index}>
+                          <td className="border p-2 text-center">
+                            <img 
+                              src={`/images-source/${sourceImageName}`} 
+                              alt="Source" 
+                              className="mx-auto max-h-32 max-w-full object-contain"
+                            />
+                          </td>
+                          <td className="border p-2 text-center">
+                            {item.capturedImage && (
+                              <img 
+                                src={item.capturedImage} 
+                                alt="Capturée" 
+                                className="mx-auto max-h-32 max-w-full object-contain"
+                              />
+                            )}
+                          </td>
+                          <td className="border p-2 text-center">
+                            {item.comparisonImageDataUrl && (
+                              <img 
+                                src={item.comparisonImageDataUrl} 
+                                alt="Comparaison" 
+                                className="mx-auto max-h-32 max-w-full object-contain"
+                              />
+                            )}
+                          </td>
+                          <td className="border p-2 text-center">
+                            {item.comparisonInfo}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="border p-2 text-center">Aucune comparaison trouvée</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
