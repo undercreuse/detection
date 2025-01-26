@@ -1,366 +1,277 @@
-class PatternDetectionService {
-  constructor() {
-    console.log('Initializing PatternDetectionService');
-    this.sourceImages = [
-      '/images-source/unum1.png',
-      '/images-source/unum2.png', 
-      '/images-source/unum3.png', 
-      '/images-source/unum4.png'
-    ];
-    console.log("Chemins des images sources :", this.sourceImages);
-    this.isInitialized = false;
-    this.initPromise = null;
-    this.initialize();
-  }
+/* global cv */
+import React from 'react';
 
-  initialize() {
-    this.initPromise = new Promise((resolve) => {
-      const maxAttempts = 10;
-      let attempts = 0;
-
-      const checkOpenCV = () => {
-        attempts++;
-        console.log(`Checking OpenCV availability (attempt ${attempts}/${maxAttempts})`);
-
-        if (window.cv && typeof window.cv.Mat === 'function') {
-          console.log('OpenCV is available, loading source images...');
-          this.loadSourceImages().then(() => {
-            this.isInitialized = true;
-            resolve();
-          }).catch(error => {
-            console.error('Failed to load source images:', error);
-            resolve();
-          });
-        } else if (attempts < maxAttempts) {
-          console.log('OpenCV not yet available, waiting...');
-          setTimeout(checkOpenCV, 1000);
-        } else {
-          console.error('OpenCV failed to load after maximum attempts');
-          resolve();
-        }
-      };
-
-      checkOpenCV();
-    });
-  }
-
-  async loadSourceImages() {
-    try {
-      this.sourceImages = await Promise.all(
-        this.sourceImages.map(async (url, index) => {
-          console.log(`Loading image ${index + 1}/${this.sourceImages.length}: ${url}`);
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`Failed to load image: ${url}`);
-          }
-          const blob = await response.blob();
-          const img = await this.blobToImage(blob);
-          console.log(`Computing descriptors for image ${index + 1}`);
-          const descriptors = await this.computeImageDescriptors(img);
-          return { url, descriptors };
-        })
-      );
-      console.log(`Loaded ${this.sourceImages.length} source images successfully`);
-    } catch (error) {
-      console.error('Error loading source images:', error);
-      throw error;
-    }
-  }
-
-  async blobToImage(blob) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = URL.createObjectURL(blob);
-    });
-  }
-
-  async computeImageDescriptors(img) {
-    if (!window.cv || !window.cv.Mat) {
-      throw new Error('OpenCV not properly initialized');
-    }
-
-    const mat = window.cv.imread(img);
-    const gray = new window.cv.Mat();
-    window.cv.cvtColor(mat, gray, window.cv.COLOR_RGBA2GRAY);
-
-    const orb = new window.cv.ORB();
-    const keypoints = new window.cv.KeyPointVector();
-    const descriptors = new window.cv.Mat();
-    
-    orb.detect(gray, keypoints);
-    orb.compute(gray, keypoints, descriptors);
-
-    mat.delete();
-    gray.delete();
-    orb.delete();
-
-    return {
-      keypoints,
-      descriptors
-    };
-  }
-
-  async detectPattern(capturedImage) {
-    if (!this.isInitialized) {
-      await this.initPromise;
-      if (!this.isInitialized) {
-        throw new Error('Service failed to initialize');
-      }
-    }
-
-    try {
-      const img = await this.dataURLToImage(capturedImage);
-      const capturedDescriptors = await this.computeImageDescriptors(img);
-      
-      // Détecter les rectangles
-      const rectangles = await this.detectRectangles(img);
-
-      const matches = await Promise.all(
-        this.sourceImages.map(async (sourceImage) => {
-          const matchCount = this.matchDescriptors(
-            capturedDescriptors.descriptors,
-            sourceImage.descriptors.descriptors
-          );
-
-          return {
-            sourceUrl: sourceImage.url,
-            matchCount,
-            confidence: this.calculateConfidence(matchCount, sourceImage.descriptors.keypoints.size())
-          };
-        })
-      );
-
-      const bestMatch = matches.reduce((best, current) => 
-        current.confidence > best.confidence ? current : best
-      );
-
-      return {
-        matchFound: bestMatch.confidence > 0.6,
-        confidence: Math.round(bestMatch.confidence * 100),
-        fileName: bestMatch.sourceUrl.split('/').pop(),
-        detectedPatterns: bestMatch.matchCount,
-        commonFeatures: Math.round(bestMatch.matchCount * 0.8),
-        rectangles: {
-          count: rectangles.length,
-          found: rectangles.length > 0,
-          coordinates: rectangles
-        }
-      };
-    } catch (error) {
-      console.error('Error in pattern detection:', error);
-      throw error;
-    }
-  }
-
-  async dataURLToImage(dataURL) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = dataURL;
-    });
-  }
-
-  async detectRectangles(img) {
-    const src = window.cv.imread(img);
-    const dst = new window.cv.Mat();
-    const gray = new window.cv.Mat();
-    const edges = new window.cv.Mat();
-    const contours = new window.cv.MatVector();
-    const hierarchy = new window.cv.Mat();
-    const rectangles = [];
-
-    try {
-      // Convertir en niveaux de gris
-      window.cv.cvtColor(src, gray, window.cv.COLOR_RGBA2GRAY);
-      
-      // Appliquer un flou gaussien pour réduire le bruit
-      window.cv.GaussianBlur(gray, gray, new window.cv.Size(5, 5), 0);
-      
-      // Détection des contours avec Canny
-      window.cv.Canny(gray, edges, 50, 150, 3, false);
-      
-      // Trouver les contours
-      window.cv.findContours(edges, contours, hierarchy, window.cv.RETR_EXTERNAL, window.cv.CHAIN_APPROX_SIMPLE);
-
-      // Analyser chaque contour
-      for (let i = 0; i < contours.size(); i++) {
-        const contour = contours.get(i);
-        const perimeter = window.cv.arcLength(contour, true);
-        const approx = new window.cv.Mat();
+export default class PatternDetectionService {
+    constructor() {
+        console.log("PatternDetectionService initialisé");
         
-        // Approximer le contour
-        window.cv.approxPolyDP(contour, approx, 0.02 * perimeter, true);
+        this.sourceImages = [
+            '/images-source/unum1.png',
+            '/images-source/unum2.png', 
+            '/images-source/unum3.png', 
+            '/images-source/unum4.png'
+        ];
+        this.logoTemplate = null;
+        this.isReady = false;
+        
+        // Charger OpenCV
+        this.loadOpenCV();
+    }
 
-        // Si le contour a 4 points et une aire suffisante, c'est probablement un rectangle
-        if (approx.rows === 4) {
-          const area = window.cv.contourArea(contour);
-          if (area > 1000) { // Filtrer les trop petits rectangles
-            // Extraire les coordonnées du rectangle
-            const points = [];
-            for (let j = 0; j < 4; j++) {
-              const point = approx.data32S.slice(j * 2, (j * 2) + 2);
-              points.push({ x: point[0], y: point[1] });
+    loadOpenCV() {
+        // Vérifier si OpenCV est déjà chargé
+        if (typeof cv !== 'undefined' && cv.Mat) {
+            console.log('OpenCV déjà chargé');
+            this.initLogoTemplate();
+            return;
+        }
+
+        // Vérifier si le script OpenCV est déjà en cours de chargement
+        if (document.querySelector('script[src="/opencv.js"]')) {
+            console.log('Script OpenCV déjà en cours de chargement');
+            return;
+        }
+
+        // Ajouter un script pour charger OpenCV dynamiquement
+        const script = document.createElement('script');
+        script.src = '/opencv.js';
+        script.async = true;
+        script.onload = () => {
+            console.log('Script OpenCV chargé');
+            
+            // Configuration du module OpenCV
+            if (!window.Module) {
+                window.Module = {};
             }
-            rectangles.push(points);
-          }
-        }
-        
-        approx.delete();
-      }
 
-      return rectangles;
-    } finally {
-      // Libérer la mémoire
-      src.delete();
-      dst.delete();
-      gray.delete();
-      edges.delete();
-      contours.delete();
-      hierarchy.delete();
-    }
-  }
+            window.Module.onRuntimeInitialized = () => {
+                console.log('OpenCV Runtime initialisé');
+                
+                // Vérifier la disponibilité de cv
+                const checkOpenCVReady = () => {
+                    if (typeof cv !== 'undefined' && cv.Mat) {
+                        console.log('OpenCV prêt');
+                        this.initLogoTemplate();
+                    } else {
+                        console.warn('OpenCV pas encore prêt');
+                        setTimeout(checkOpenCVReady, 100);
+                    }
+                };
 
-  matchDescriptors(desc1, desc2) {
-    const matcher = new window.cv.BFMatcher();
-    const matches = new window.cv.DMatchVector();
-    
-    matcher.match(desc1, desc2, matches);
-
-    const goodMatches = this.filterGoodMatches(matches);
-    
-    matcher.delete();
-    matches.delete();
-
-    return goodMatches.length;
-  }
-
-  filterGoodMatches(matches) {
-    const matchesArray = [];
-    for (let i = 0; i < matches.size(); i++) {
-      matchesArray.push(matches.get(i));
-    }
-
-    matchesArray.sort((a, b) => a.distance - b.distance);
-
-    const goodMatches = matchesArray.filter((match, i) => 
-      i < 50 && match.distance < 2 * matchesArray[0].distance
-    );
-
-    return goodMatches;
-  }
-
-  calculateConfidence(matchCount, keypointCount) {
-    const ratio = matchCount / keypointCount;
-    return Math.min(ratio * 2, 1);
-  }
-
-  async compareImages(capturedImageDataUrl) {
-    console.log("Début de compareImages avec l'image :", capturedImageDataUrl ? capturedImageDataUrl.substring(0, 50) + '...' : 'Pas d\'image');
-    
-    if (!capturedImageDataUrl) {
-      console.error("Aucune image capturée");
-      return [];
-    }
-
-    const comparisons = [];
-
-    try {
-      console.log("Début de la boucle de comparaison");
-      for (const sourceImagePath of this.sourceImages) {
-        console.log("Tentative de comparaison avec l'image source :", sourceImagePath);
-        
-        try {
-          console.log(`Début de compareImagePair pour ${sourceImagePath}`);
-          const comparisonResult = await this.compareImagePair(sourceImagePath, capturedImageDataUrl);
-          console.log(`Résultat de compareImagePair pour ${sourceImagePath} :`, comparisonResult);
-          comparisons.push(comparisonResult);
-        } catch (pairComparisonError) {
-          console.error(`Erreur lors de la comparaison avec ${sourceImagePath}:`, pairComparisonError);
-          
-          // Générer un résultat par défaut en cas d'erreur
-          comparisons.push({
-            sourceImage: sourceImagePath, // Utiliser directement le chemin
-            capturedImage: capturedImageDataUrl || null,
-            comparisonImageDataUrl: null,
-            similarityScore: 0,
-            comparisonInfo: 'Comparaison impossible'
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Erreur globale lors de la comparaison des images :", error);
-    }
-
-    console.log("Nombre de comparaisons effectuées :", comparisons.length);
-    return comparisons;
-  }
-
-  async compareImagePair(sourceImagePath, capturedImageDataUrl) {
-    return new Promise((resolve, reject) => {
-      const sourceImage = new Image();
-      const capturedImage = new Image();
-
-      sourceImage.crossOrigin = 'Anonymous';
-      capturedImage.crossOrigin = 'Anonymous';
-
-      sourceImage.onerror = (e) => {
-        console.error("Erreur de chargement de l'image source :", e, sourceImagePath);
-        reject(e);
-      };
-
-      capturedImage.onerror = (e) => {
-        console.error("Erreur de chargement de l'image capturée :", e);
-        reject(e);
-      };
-
-      sourceImage.onload = () => {
-        console.log("Image source chargée avec succès");
-        capturedImage.onload = () => {
-          console.log("Image capturée chargée avec succès");
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // Redimensionner les images à la même taille
-          canvas.width = Math.min(sourceImage.width, capturedImage.width);
-          canvas.height = Math.min(sourceImage.height, capturedImage.height);
-
-          // Dessiner les images sur le canvas
-          ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-          ctx.globalAlpha = 0.5;
-          ctx.drawImage(capturedImage, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-
-          // Calculer une métrique de similarité simple
-          const comparisonImageDataUrl = canvas.toDataURL('image/jpeg');
-          const similarityScore = this.calculateSimilarityScore(sourceImage, capturedImage);
-
-          resolve({
-            sourceImage: sourceImagePath, // Utiliser directement le chemin
-            capturedImage: capturedImageDataUrl,
-            comparisonImageDataUrl: comparisonImageDataUrl,
-            similarityScore: similarityScore,
-            comparisonInfo: `Similarité : ${(similarityScore * 100).toFixed(2)}%`
-          });
+                checkOpenCVReady();
+            };
         };
-        capturedImage.src = capturedImageDataUrl;
-      };
-      
-      // Charger l'image source avec le chemin complet
-      const fullSourcePath = window.location.origin + sourceImagePath;
-      console.log(`Chargement de l'image source à partir de :`, fullSourcePath);
-      sourceImage.src = fullSourcePath;
-    });
-  }
+        script.onerror = () => {
+            console.error('Erreur de chargement du script OpenCV');
+        };
+        document.head.appendChild(script);
 
-  calculateSimilarityScore(img1, img2) {
-    // Une méthode simple de calcul de similarité basée sur les dimensions
-    const widthSimilarity = 1 - Math.abs(img1.width - img2.width) / Math.max(img1.width, img2.width);
-    const heightSimilarity = 1 - Math.abs(img1.height - img2.height) / Math.max(img1.height, img2.height);
-    
-    return (widthSimilarity + heightSimilarity) / 2;
-  }
+        // Timeout de sécurité
+        setTimeout(() => {
+            if (!this.isReady) {
+                console.error('OpenCV non chargé après 10 secondes');
+            }
+        }, 10000);
+    }
+
+    async initLogoTemplate() {
+        return new Promise((resolve, reject) => {
+            try {
+                console.log('Début de initLogoTemplate');
+                
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                
+                img.onload = () => {
+                    console.log('Image logo chargée');
+                    try {
+                        // Vérifier que cv.Mat est disponible
+                        if (typeof cv === 'undefined' || !cv.Mat) {
+                            throw new Error('OpenCV non initialisé');
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Obtenir les données de l'image
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        // Créer la matrice OpenCV de manière sécurisée
+                        const sourceMat = cv.matFromImageData(imageData);
+
+                        // Convertir en niveaux de gris
+                        const gray = new cv.Mat();
+                        cv.cvtColor(sourceMat, gray, cv.COLOR_RGBA2GRAY);
+                        
+                        // Détection de features ORB
+                        const orb = new cv.ORB();
+                        const keypoints = new cv.KeyPointVector();
+                        const descriptors = new cv.Mat();
+                        orb.detect(gray, keypoints);
+                        orb.compute(gray, keypoints, descriptors);
+                        
+                        this.logoTemplate = {
+                            keypoints: keypoints,
+                            descriptors: descriptors,
+                            method: 'ORB'
+                        };
+                        
+                        this.isReady = true;
+                        console.log('Logo template initialisé avec ORB');
+                        resolve();
+                    } catch (processError) {
+                        console.error('Erreur de traitement de l\'image', processError);
+                        reject(processError);
+                    }
+                };
+                
+                img.onerror = (error) => {
+                    console.error("Erreur de chargement du logo template", error);
+                    reject(error);
+                };
+                
+                img.src = '/images-source/logoUS.png'; 
+            } catch (error) {
+                console.error('Erreur globale dans initLogoTemplate', error);
+                reject(error);
+            }
+        });
+    }
+
+    async compareImages(capturedImageDataUrl) {
+        if (!this.isReady) {
+            await this.initLogoTemplate();
+        }
+
+        const comparisons = [];
+
+        for (const sourceImagePath of this.sourceImages) {
+            try {
+                const comparisonResult = await this.compareImagePair(sourceImagePath, capturedImageDataUrl);
+                comparisons.push(comparisonResult);
+            } catch (error) {
+                console.error(`Erreur lors de la comparaison avec ${sourceImagePath}:`, error);
+                comparisons.push({
+                    sourceImage: sourceImagePath,
+                    capturedImage: capturedImageDataUrl,
+                    comparisonImageDataUrl: null,
+                    similarityScore: 0,
+                    comparisonInfo: 'Comparaison impossible'
+                });
+            }
+        }
+
+        return comparisons;
+    }
+
+    async compareImagePair(sourceImagePath, capturedImageDataUrl) {
+        if (!this.isReady) {
+            throw new Error('Service de détection non initialisé');
+        }
+
+        return new Promise((resolve, reject) => {
+            const sourceImage = new Image();
+            const capturedImage = new Image();
+
+            sourceImage.crossOrigin = 'Anonymous';
+            capturedImage.crossOrigin = 'Anonymous';
+
+            sourceImage.onload = () => {
+                capturedImage.onload = () => {
+                    try {
+                        // Vérifier que cv.Mat est disponible
+                        if (typeof cv === 'undefined' || !cv.Mat) {
+                            throw new Error('OpenCV non initialisé');
+                        }
+
+                        // Créer des canvas pour les images
+                        const sourceCanvas = document.createElement('canvas');
+                        sourceCanvas.width = sourceImage.width;
+                        sourceCanvas.height = sourceImage.height;
+                        const sourceCtx = sourceCanvas.getContext('2d');
+                        sourceCtx.drawImage(sourceImage, 0, 0);
+
+                        const capturedCanvas = document.createElement('canvas');
+                        capturedCanvas.width = capturedImage.width;
+                        capturedCanvas.height = capturedImage.height;
+                        const capturedCtx = capturedCanvas.getContext('2d');
+                        capturedCtx.drawImage(capturedImage, 0, 0);
+
+                        // Obtenir les données des images
+                        const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+                        const capturedImageData = capturedCtx.getImageData(0, 0, capturedCanvas.width, capturedCanvas.height);
+
+                        // Créer des matrices OpenCV via matFromImageData
+                        const sourceMat = cv.matFromImageData(sourceImageData);
+                        const capturedMat = cv.matFromImageData(capturedImageData);
+
+                        // Convertir en niveaux de gris
+                        const sourceGray = new cv.Mat();
+                        const capturedGray = new cv.Mat();
+                        cv.cvtColor(sourceMat, sourceGray, cv.COLOR_RGBA2GRAY);
+                        cv.cvtColor(capturedMat, capturedGray, cv.COLOR_RGBA2GRAY);
+
+                        // Détection de features ORB
+                        const orb = new cv.ORB();
+                        const sourceKeypoints = new cv.KeyPointVector();
+                        const sourceDescriptors = new cv.Mat();
+                        const capturedKeypoints = new cv.KeyPointVector();
+                        const capturedDescriptors = new cv.Mat();
+
+                        orb.detect(sourceGray, sourceKeypoints);
+                        orb.compute(sourceGray, sourceKeypoints, sourceDescriptors);
+                        orb.detect(capturedGray, capturedKeypoints);
+                        orb.compute(capturedGray, capturedKeypoints, capturedDescriptors);
+
+                        // Matching des descripteurs
+                        const matcher = new cv.BFMatcher(cv.NORM_HAMMING, true);
+                        const matches = new cv.DMatchVector();
+                        matcher.match(sourceDescriptors, capturedDescriptors, matches);
+
+                        // Calculer le score de similarité
+                        const goodMatches = Array.from({length: matches.size()}, (_, i) => matches.get(i))
+                            .filter(match => match.distance < 50);
+                        
+                        const similarityScore = goodMatches.length / Math.max(sourceKeypoints.size(), capturedKeypoints.size());
+
+                        // Créer une image de comparaison
+                        const comparisonCanvas = document.createElement('canvas');
+                        comparisonCanvas.width = Math.max(sourceImage.width, capturedImage.width);
+                        comparisonCanvas.height = Math.max(sourceImage.height, capturedImage.height);
+                        const comparisonCtx = comparisonCanvas.getContext('2d');
+                        
+                        comparisonCtx.globalAlpha = 0.5;
+                        comparisonCtx.drawImage(sourceImage, 0, 0);
+                        comparisonCtx.drawImage(capturedImage, 0, 0);
+
+                        resolve({
+                            sourceImage: sourceImagePath,
+                            capturedImage: capturedImageDataUrl,
+                            comparisonImageDataUrl: comparisonCanvas.toDataURL('image/jpeg'),
+                            similarityScore: similarityScore,
+                            comparisonInfo: `Similarité : ${(similarityScore * 100).toFixed(2)}% (${goodMatches.length} correspondances)`
+                        });
+
+                        // Libérer la mémoire
+                        sourceMat.delete();
+                        capturedMat.delete();
+                        sourceGray.delete();
+                        capturedGray.delete();
+                        sourceDescriptors.delete();
+                        capturedDescriptors.delete();
+                        matcher.delete();
+                    } catch (error) {
+                        console.error("Erreur dans compareImagePair :", error);
+                        reject(error);
+                    }
+                };
+                capturedImage.src = capturedImageDataUrl;
+            };
+            
+            sourceImage.src = window.location.origin + sourceImagePath;
+        });
+    }
 }
-
-export default new PatternDetectionService();

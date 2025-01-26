@@ -17,12 +17,21 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>Détection de formes</title>
     <script>
-      function onOpenCvReady() {
-        console.log('OpenCV.js is ready');
-        window.onOpenCvReady && window.onOpenCvReady();
-      }
+      // Configuration globale pour OpenCV
+      var Module = {
+        onRuntimeInitialized() {
+          console.log('OpenCV Runtime initialisé');
+          if (window.onOpenCvReady) {
+            window.onOpenCvReady();
+          }
+        }
+      };
     </script>
-    <script src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" async></script>
+    <script 
+      src="%PUBLIC_URL%/opencv.js" 
+      async 
+      defer
+    ></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

@@ -9,10 +9,13 @@ const ObjectDetectionApp = () => {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [isServiceReady, setIsServiceReady] = useState(false);
-  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [patternService, setPatternService] = useState(null);
+  const [comparisonResult, setComparisonResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonData, setComparisonData] = useState([]);
+  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -20,14 +23,18 @@ const ObjectDetectionApp = () => {
   const appUrl = window.location.href.replace('localhost', window.location.hostname);
 
   useEffect(() => {
-    const checkServiceStatus = setInterval(() => {
-      if (PatternDetectionService.isInitialized) {
-        setIsServiceReady(true);
-        clearInterval(checkServiceStatus);
+    const service = new PatternDetectionService();
+    
+    const checkServiceReady = () => {
+      if (service.isReady) {
+        setPatternService(service);
+        setIsLoading(false);
+      } else {
+        setTimeout(checkServiceReady, 500);
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(checkServiceStatus);
+    checkServiceReady();
   }, []);
 
   useEffect(() => {
@@ -66,7 +73,7 @@ const ObjectDetectionApp = () => {
   };
 
   const captureImage = () => {
-    if (!isServiceReady) {
+    if (!patternService) {
       console.warn("Le service de détection n'est pas encore prêt");
       return;
     }
@@ -102,7 +109,7 @@ const ObjectDetectionApp = () => {
   const processImage = async (imageData) => {
     setIsProcessing(true);
     try {
-      const results = await PatternDetectionService.detectPattern(imageData);
+      const results = await patternService.detectPattern(imageData);
       if (results) {
         setAnalysisResults(results);
       } else {
@@ -139,7 +146,7 @@ const ObjectDetectionApp = () => {
     if (capturedImage) {
       try {
         console.log("Appel de PatternDetectionService.compareImages()");
-        const comparisons = await PatternDetectionService.compareImages(capturedImage);
+        const comparisons = await patternService.compareImages(capturedImage);
         console.log("Comparaisons reçues :", comparisons);
         
         setComparisonData(comparisons);
@@ -151,6 +158,41 @@ const ObjectDetectionApp = () => {
     } else {
       console.warn("Pas d'image capturée");
       alert('Veuillez d\'abord capturer une image');
+    }
+  };
+
+  const testImageComparison = async () => {
+    if (!patternService) {
+      setError('Service de détection non initialisé');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // Charger une image de test
+      const testImageResponse = await fetch('/images-source/unum1.png');
+      const testImageBlob = await testImageResponse.blob();
+      const testImageDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(testImageBlob);
+      });
+
+      // Comparer avec une autre image source
+      const result = await patternService.compareImagePair(
+        '/images-source/unum2.png', 
+        testImageDataUrl
+      );
+
+      console.log('Résultat de la comparaison :', result);
+      setComparisonResult(result);
+      setError(null);
+    } catch (error) {
+      console.error('Erreur lors de la comparaison :', error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -203,6 +245,14 @@ const ObjectDetectionApp = () => {
                 </svg>
               </button>
             )}
+            <button
+              onClick={testImageComparison}
+              className="ml-2 p-2 rounded-full bg-primary-lighter hover:bg-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-white hover:text-primary-lighter">
+                <path d="M12 10v6m0 0l-3-3m3 3l3-3m-3 3H9m0 0a9 9 0 110-18 9 9 0 010 18z"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -232,12 +282,12 @@ const ObjectDetectionApp = () => {
           </div>
           <button
             onClick={captureImage}
-            disabled={isProcessing || !isServiceReady}
+            disabled={isProcessing || !patternService}
             className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-4 rounded-full bg-primary-lighter text-white hover:bg-white hover:text-primary-lighter disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <Scan className="w-8 h-8 animate-spin" />
-            ) : !isServiceReady ? (
+            ) : !patternService ? (
               <div className="flex items-center space-x-2">
                 <Scan className="w-8 h-8 animate-pulse" />
               </div>
@@ -249,7 +299,7 @@ const ObjectDetectionApp = () => {
 
         {/* Zone des résultats et image capturée */}
         <div className="flex-1 bg-primary-light p-4 overflow-y-auto">
-          {!isServiceReady && (
+          {isLoading && (
             <div className="text-white text-center">
               <p>Initialisation du service de détection...</p>
               <div className="mt-2">
