@@ -27,8 +27,15 @@ export default class PatternDetectionService {
         }
 
         // Vérifier si le script OpenCV est déjà en cours de chargement
-        if (document.querySelector('script[src="/opencv.js"]')) {
+        const existingScript = document.querySelector('script[src="/opencv.js"]');
+        if (existingScript) {
             console.log('Script OpenCV déjà en cours de chargement');
+            
+            // Ajouter un écouteur d'événement pour détecter le chargement
+            existingScript.addEventListener('load', () => {
+                console.log('Script OpenCV chargé via écouteur');
+                this.initializeOpenCVRuntime();
+            });
             return;
         }
 
@@ -38,28 +45,7 @@ export default class PatternDetectionService {
         script.async = true;
         script.onload = () => {
             console.log('Script OpenCV chargé');
-            
-            // Configuration du module OpenCV
-            if (!window.Module) {
-                window.Module = {};
-            }
-
-            window.Module.onRuntimeInitialized = () => {
-                console.log('OpenCV Runtime initialisé');
-                
-                // Vérifier la disponibilité de cv
-                const checkOpenCVReady = () => {
-                    if (typeof cv !== 'undefined' && cv.Mat) {
-                        console.log('OpenCV prêt');
-                        this.initLogoTemplate();
-                    } else {
-                        console.warn('OpenCV pas encore prêt');
-                        setTimeout(checkOpenCVReady, 100);
-                    }
-                };
-
-                checkOpenCVReady();
-            };
+            this.initializeOpenCVRuntime();
         };
         script.onerror = () => {
             console.error('Erreur de chargement du script OpenCV');
@@ -72,6 +58,30 @@ export default class PatternDetectionService {
                 console.error('OpenCV non chargé après 10 secondes');
             }
         }, 10000);
+    }
+
+    initializeOpenCVRuntime() {
+        // Configuration du module OpenCV
+        if (!window.Module) {
+            window.Module = {};
+        }
+
+        window.Module.onRuntimeInitialized = () => {
+            console.log('OpenCV Runtime initialisé');
+            
+            // Vérifier la disponibilité de cv
+            const checkOpenCVReady = () => {
+                if (typeof cv !== 'undefined' && cv.Mat) {
+                    console.log('OpenCV prêt');
+                    this.initLogoTemplate();
+                } else {
+                    console.warn('OpenCV pas encore prêt');
+                    setTimeout(checkOpenCVReady, 100);
+                }
+            };
+
+            checkOpenCVReady();
+        };
     }
 
     async initLogoTemplate() {
