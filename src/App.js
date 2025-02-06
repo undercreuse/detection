@@ -291,76 +291,127 @@ const ObjectDetectionApp = () => {
           </button>
         </div>
 
-        {/* Zone des résultats et image capturée */}
+        {/* Zone principale avec informations de correspondance */}
         <div className="flex-1 bg-primary-light p-4 overflow-y-auto">
-          {isLoading && (
-            <div className="text-white text-center">
-              <p>Initialisation du service de détection...</p>
-              <div className="mt-2">
-                <Scan className="w-6 h-6 animate-spin mx-auto" />
+          <div className="space-y-4">
+            {comparisonData.length > 0 && (
+              <div className="bg-white shadow-md rounded-lg p-4">
+                {(() => {
+                  const maxSimilarityIndex = comparisonData.reduce((maxIndex, currentItem, currentIndex) => 
+                    parseFloat(currentItem.similarity) > parseFloat(comparisonData[maxIndex].similarity) 
+                      ? currentIndex 
+                      : maxIndex, 0);
+                  
+                  const bestMatch = comparisonData[maxSimilarityIndex];
+                  const sourceImageName = typeof bestMatch.sourceImage === 'string' 
+                    ? bestMatch.sourceImage.split('/').pop() 
+                    : `unum${maxSimilarityIndex + 1}.png`;
+
+                  // N'afficher que si la similitude est significative (par exemple > 50%)
+                  if (parseFloat(bestMatch.similarity) > 50) {
+                    return (
+                      <div>
+                        <h2 className="text-xl font-bold mb-4">Meilleure Correspondance</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p>Correspondance trouvée : {bestMatch.correspondance > 0 ? 'Oui' : 'Non'}</p>
+                            <p>Correspondance préférée : {sourceImageName}</p>
+                            <p>Confiance : {bestMatch.similarity}%</p>
+                            <p>Motifs détectés : {bestMatch.correspondance}</p>
+                            <p>Caractéristiques communes : {bestMatch.correspondance}</p>
+                          </div>
+                          {bestMatch.similarity > 0 && (
+                            <div className="flex items-center justify-center">
+                              <a 
+                                href={`https://mon-porte-clef.unum-solum.com/register/65N8S9Q2LC/${sourceImageName}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                              >
+                                Voir le détail
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Retourner null si aucune correspondance significative
+                  return null;
+                })()}
               </div>
-            </div>
-          )}
-          {analysisResults && (
-            <div className="space-y-4">
-              <div className="space-y-2 text-white">
-                <div className="flex items-center justify-between">
-                  <span>Correspondance trouvée:</span>
-                  <span className={analysisResults.matchFound ? "text-green-400" : "text-red-400"}>
-                    {analysisResults.matchFound ? "Oui" : "Non"}
-                  </span>
+            )}
+            {/* Reste du contenu existant */}
+            {isLoading && (
+              <div className="text-white text-center">
+                <p>Initialisation du service de détection...</p>
+                <div className="mt-2">
+                  <Scan className="w-6 h-6 animate-spin mx-auto" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Confiance:</span>
-                  <span>{analysisResults.confidence}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Motifs détectés:</span>
-                  <span>{analysisResults.detectedPatterns}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Caractéristiques communes:</span>
-                  <span>{analysisResults.commonFeatures}</span>
-                </div>
-                {analysisResults.rectangles && (
+              </div>
+            )}
+            {analysisResults && (
+              <div className="space-y-4">
+                <div className="space-y-2 text-white">
                   <div className="flex items-center justify-between">
-                    <span>Rectangles détectés:</span>
-                    <span className={analysisResults.rectangles.found ? "text-green-400" : "text-red-400"}>
-                      {analysisResults.rectangles.count}
+                    <span>Correspondance trouvée:</span>
+                    <span className={analysisResults.matchFound ? "text-green-400" : "text-red-400"}>
+                      {analysisResults.matchFound ? "Oui" : "Non"}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Confiance:</span>
+                    <span>{analysisResults.confidence}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Motifs détectés:</span>
+                    <span>{analysisResults.detectedPatterns}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Caractéristiques communes:</span>
+                    <span>{analysisResults.commonFeatures}</span>
+                  </div>
+                  {analysisResults.rectangles && (
+                    <div className="flex items-center justify-between">
+                      <span>Rectangles détectés:</span>
+                      <span className={analysisResults.rectangles.found ? "text-green-400" : "text-red-400"}>
+                        {analysisResults.rectangles.count}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Image capturée avec rectangles */}
+                {capturedImage && (
+                  <div className="mt-4">
+                    <p className="text-white mb-2 text-sm">Image capturée :</p>
+                    <div className="rounded-lg overflow-hidden border-2 border-primary-lighter relative">
+                      <img 
+                        src={capturedImage} 
+                        alt="Capture" 
+                        className="w-full h-auto"
+                      />
+                      {analysisResults.rectangles?.coordinates.map((rect, index) => (
+                        <svg
+                          key={index}
+                          className="absolute top-0 left-0 w-full h-full"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          <polygon
+                            points={rect.map(p => `${p.x},${p.y}`).join(' ')}
+                            fill="none"
+                            stroke="#00ff00"
+                            strokeWidth="2"
+                          />
+                        </svg>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-              
-              {/* Image capturée avec rectangles */}
-              {capturedImage && (
-                <div className="mt-4">
-                  <p className="text-white mb-2 text-sm">Image capturée :</p>
-                  <div className="rounded-lg overflow-hidden border-2 border-primary-lighter relative">
-                    <img 
-                      src={capturedImage} 
-                      alt="Capture" 
-                      className="w-full h-auto"
-                    />
-                    {analysisResults.rectangles?.coordinates.map((rect, index) => (
-                      <svg
-                        key={index}
-                        className="absolute top-0 left-0 w-full h-full"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        <polygon
-                          points={rect.map(p => `${p.x},${p.y}`).join(' ')}
-                          fill="none"
-                          stroke="#00ff00"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Modal Comparaison d'Images */}
@@ -438,9 +489,29 @@ const ObjectDetectionApp = () => {
                             <tr>
                               <td colSpan={3} className={`border p-2 ${index === maxSimilarityIndex ? 'bg-[#8caa77]' : ''}`}>
                                 <div className={`flex flex-col items-start space-y-1 ${index === maxSimilarityIndex ? 'text-white' : ''}`}>
-                                  <span>Correspondance : {item.correspondance} points</span>
-                                  <span>Similitude : {item.similarity}%</span>
-                                  <span>{item.comparisonInfo}</span>
+                                  <div className="flex justify-between w-full items-center">
+                                    <div>
+                                      {index === maxSimilarityIndex && (
+                                        <>
+                                          <p>Correspondance trouvée : {item.correspondance > 0 ? 'Oui' : 'Non'}</p>
+                                          <p>Correspondance préférée : {sourceImageName}</p>
+                                        </>
+                                      )}
+                                      <p>Confiance : {item.similarity}%</p>
+                                      <p>Motifs détectés : {item.correspondance}</p>
+                                      <p>Caractéristiques communes : {item.correspondance}</p>
+                                    </div>
+                                    {index === maxSimilarityIndex && item.similarity > 0 && (
+                                      <a 
+                                        href="https://mon-porte-clef.unum-solum.com/register/65N8S9Q2LC/" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                                      >
+                                        Voir le détail
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
