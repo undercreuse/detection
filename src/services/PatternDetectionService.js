@@ -12,18 +12,12 @@ export default class PatternDetectionService {
             return PatternDetectionService.instance;
         }
 
-        this.sourceImages = [
-            '/images-source/unum1.png',
-            '/images-source/unum2.png', 
-            '/images-source/unum3.png', 
-            '/images-source/unum4.png',
-            '/images-source/unum78.jpg',
-            '/images-source/unum79.jpg',
-            '/images-source/unum84.jpg',
-            '/images-source/unum88.jpg'
-        ];
+        this.sourceImages = [];
         this.logoTemplate = null;
         this.isReady = false;
+        
+        // Charger automatiquement toutes les images du dossier
+        this.loadSourceImages();
         
         PatternDetectionService.instance = this;
         
@@ -36,6 +30,29 @@ export default class PatternDetectionService {
             PatternDetectionService.instance = new PatternDetectionService();
         }
         return PatternDetectionService.instance;
+    }
+
+    async loadSourceImages() {
+        try {
+            // Faire une requête pour lister les fichiers du dossier
+            const response = await fetch('/images-source/');
+            const text = await response.text();
+            
+            // Créer un DOM temporaire pour parser la réponse HTML
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            
+            // Trouver tous les liens qui pointent vers des images
+            const links = Array.from(doc.querySelectorAll('a'));
+            this.sourceImages = links
+                .map(link => link.getAttribute('href'))
+                .filter(href => href && (href.endsWith('.jpg') || href.endsWith('.png') || href.endsWith('.jpeg')))
+                .map(href => `/images-source/${href}`);
+            
+            console.log('Images sources chargées:', this.sourceImages);
+        } catch (error) {
+            console.error('Erreur lors du chargement des images sources:', error);
+        }
     }
 
     async initializeOpenCVOnce() {
