@@ -16,8 +16,29 @@ const ObjectDetectionApp = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonData, setComparisonData] = useState([]);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [comparisonConfidence, setComparisonConfidence] = useState(null);
+  const [nftDetails, setNftDetails] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const cameraSound = new Audio('/clic.mp3');
+
+  useEffect(() => {
+    // Précharger le son et gérer les erreurs
+    cameraSound.onerror = (error) => {
+      console.warn('Erreur de chargement du son de l\'appareil photo', error);
+    };
+  }, []);
+
+  const playCameraSound = () => {
+    try {
+      cameraSound.currentTime = 0; // Réinitialiser la lecture
+      cameraSound.play().catch(error => {
+        console.warn('Impossible de jouer le son de l\'appareil photo', error);
+      });
+    } catch (error) {
+      console.warn('Erreur lors de la lecture du son', error);
+    }
+  };
 
   // URL actuelle de l'application
   const appUrl = window.location.href.replace('localhost', window.location.hostname);
@@ -72,37 +93,41 @@ const ObjectDetectionApp = () => {
     }
   };
 
-  const captureImage = () => {
-    if (!patternService) {
-      console.warn("Le service de détection n'est pas encore prêt");
-      return;
-    }
+  const captureImage = async () => {
+    try {
+      if (!patternService) {
+        console.warn("Le service de détection n'est pas encore prêt");
+        return;
+      }
 
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
+      if (videoRef.current && canvasRef.current) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
 
-      // Calculer les dimensions pour la capture (1:3)
-      const captureWidth = video.videoHeight * 0.267;
-      const captureHeight = captureWidth * 3;
-      const startX = (video.videoWidth - captureWidth) / 2;
-      const startY = (video.videoHeight - captureHeight) / 2;
+        // Calculer les dimensions pour la capture (1:3)
+        const captureWidth = video.videoHeight * 0.267;
+        const captureHeight = captureWidth * 3;
+        const startX = (video.videoWidth - captureWidth) / 2;
+        const startY = (video.videoHeight - captureHeight) / 2;
 
-      // Configurer le canvas pour la capture
-      canvas.width = captureWidth;
-      canvas.height = captureHeight;
+        // Configurer le canvas pour la capture
+        canvas.width = captureWidth;
+        canvas.height = captureHeight;
 
-      // Capturer uniquement la zone du rectangle
-      context.drawImage(
-        video,
-        startX, startY, captureWidth, captureHeight,
-        0, 0, captureWidth, captureHeight
-      );
+        // Capturer uniquement la zone du rectangle
+        context.drawImage(
+          video,
+          startX, startY, captureWidth, captureHeight,
+          0, 0, captureWidth, captureHeight
+        );
 
-      const imageData = canvas.toDataURL('image/jpeg');
-      setCapturedImage(imageData);
-      processImage(imageData);
+        const imageData = canvas.toDataURL('image/jpeg');
+        setCapturedImage(imageData);
+        processImage(imageData);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la prise de photo', error);
     }
   };
 
@@ -196,6 +221,12 @@ const ObjectDetectionApp = () => {
     }
   };
 
+  const viewNFT = () => {
+    if (nftDetails) {
+      window.open(nftDetails.url, '_blank');
+    }
+  };
+
   // Calculer les dimensions du rectangle de cadrage
   const getCropGuideStyle = () => {
     if (!videoSize.width || !videoSize.height) return {};
@@ -275,7 +306,10 @@ const ObjectDetectionApp = () => {
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white rounded-br"></div>
           </div>
           <button
-            onClick={captureImage}
+            onClick={() => {
+              playCameraSound();
+              captureImage();
+            }}
             disabled={isProcessing || !patternService}
             className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-4 rounded-full bg-primary-lighter text-white hover:bg-white hover:text-primary-lighter disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -408,6 +442,17 @@ const ObjectDetectionApp = () => {
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+            {comparisonConfidence && (
+              <div className="comparison-results">
+                <h3>Correspondance trouvée</h3>
+                <p>Confiance : {comparisonConfidence.toFixed(2)}%</p>
+                {nftDetails && (
+                  <button onClick={viewNFT} className="nft-button">
+                    Voir le NFT
+                  </button>
                 )}
               </div>
             )}

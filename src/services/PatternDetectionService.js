@@ -16,7 +16,11 @@ export default class PatternDetectionService {
             '/images-source/unum1.png',
             '/images-source/unum2.png', 
             '/images-source/unum3.png', 
-            '/images-source/unum4.png'
+            '/images-source/unum4.png',
+            '/images-source/unum78.jpg',
+            '/images-source/unum79.jpg',
+            '/images-source/unum84.jpg',
+            '/images-source/unum88.jpg'
         ];
         this.logoTemplate = null;
         this.isReady = false;
