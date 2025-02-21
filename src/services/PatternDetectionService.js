@@ -34,21 +34,13 @@ export default class PatternDetectionService {
 
     async loadSourceImages() {
         try {
-            // Faire une requête pour lister les fichiers du dossier
-            const response = await fetch('/images-source/');
-            const text = await response.text();
+            // Utiliser le nouvel endpoint pour récupérer la liste des images
+            const response = await fetch('/api/images');
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
             
-            // Créer un DOM temporaire pour parser la réponse HTML
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(text, 'text/html');
-            
-            // Trouver tous les liens qui pointent vers des images
-            const links = Array.from(doc.querySelectorAll('a'));
-            this.sourceImages = links
-                .map(link => link.getAttribute('href'))
-                .filter(href => href && (href.endsWith('.jpg') || href.endsWith('.png') || href.endsWith('.jpeg')))
-                .map(href => `/images-source/${href}`);
-            
+            this.sourceImages = await response.json();
             console.log('Images sources chargées:', this.sourceImages);
         } catch (error) {
             console.error('Erreur lors du chargement des images sources:', error);

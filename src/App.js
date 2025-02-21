@@ -4,6 +4,18 @@ import logo from './logo.png';
 import { QRCodeCanvas } from 'qrcode.react';
 import PatternDetectionService from './services/PatternDetectionService';
 
+// Correspondance entre les numéros et les codes de porte-clefs
+const keyChainCodes = {
+  '1': '65N8S9Q2LC',
+  '2': '5U5317B3IJ',
+  '3': 'B69JTMHHEV',
+  '4': 'V4DHWQK4L9',
+  '78': 'SUQBNEXFHN',
+  '79': 'DWZPPMZHB5',
+  '84': 'OVK46SNAJF',
+  '88': 'FXW4NBSBNQ'
+};
+
 const ObjectDetectionApp = () => {
   const [capturedImage, setCapturedImage] = useState(null);
   const [analysisResults, setAnalysisResults] = useState(null);
@@ -20,7 +32,7 @@ const ObjectDetectionApp = () => {
   const [nftDetails, setNftDetails] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const cameraSound = new Audio('/clic.mp3');
+  const cameraSound = new Audio('/clic2.mp3');
 
   useEffect(() => {
     // Précharger le son et gérer les erreurs
@@ -93,6 +105,12 @@ const ObjectDetectionApp = () => {
     }
   };
 
+  const handleCapture = async () => {
+    // Jouer le son de clic
+    const clickSound = new Audio('/clic2.mp3');
+    await clickSound.play().catch(e => console.log('Erreur audio:', e));
+  };
+
   const captureImage = async () => {
     try {
       if (!patternService) {
@@ -135,8 +153,32 @@ const ObjectDetectionApp = () => {
     setIsProcessing(true);
     try {
       const results = await patternService.detectPattern(imageData);
-      if (results) {
-        setAnalysisResults(results);
+      console.log("Résultats de la détection:", results);
+      
+      if (results && results.matchFound && results.confidence > 50) {
+        const sourceImageName = results.fileName.split('/').pop();
+        setAnalysisResults({
+          ...results,
+          sourceImageName
+        });
+        
+        // Déclencher automatiquement la comparaison
+        console.log("Comparaison automatique avec l'image détectée");
+        const comparisons = await patternService.compareImages(imageData);
+        console.log("Comparaisons reçues:", comparisons);
+        
+        // Forcer la mise à jour synchrone
+        setComparisonData(comparisons);
+        console.log("Ouverture du popup...");
+        setShowComparison(true);
+        
+        // Double vérification après un court délai
+        setTimeout(() => {
+          if (!showComparison) {
+            console.log("Ré-essai d'ouverture du popup...");
+            setShowComparison(true);
+          }
+        }, 500);
       } else {
         setAnalysisResults({
           matchFound: false,
@@ -258,7 +300,6 @@ const ObjectDetectionApp = () => {
             />
           </div>
           <div className="flex space-x-2">
-            
             {capturedImage && (
               <button
                 onClick={handleComparison}
@@ -277,12 +318,11 @@ const ObjectDetectionApp = () => {
             >
               <QrCode className="w-6 h-6 text-white hover:text-primary-lighter" />
             </button>
-            
           </div>
         </div>
 
         {/* Zone de la caméra */}
-        <div className="relative flex-[2] bg-black">
+        <div className="relative flex-[5] bg-black">
           <video
             ref={videoRef}
             autoPlay
@@ -307,7 +347,8 @@ const ObjectDetectionApp = () => {
           </div>
           <button
             onClick={() => {
-              playCameraSound();
+              const clickSound = new Audio('/clic2.mp3');
+              clickSound.play().catch(e => console.log('Erreur audio:', e));
               captureImage();
             }}
             disabled={isProcessing || !patternService}
@@ -325,135 +366,15 @@ const ObjectDetectionApp = () => {
           </button>
         </div>
 
-        {/* Zone principale avec informations de correspondance */}
-        <div className="flex-1 bg-primary-light p-4 overflow-y-auto">
+        {/* Zone principale */}
+        <div className="h-16 bg-primary-light p-4 overflow-y-auto">
           <div className="space-y-4">
-            {comparisonData.length > 0 && (
-              <div className="bg-white shadow-md rounded-lg p-4">
-                {(() => {
-                  const maxSimilarityIndex = comparisonData.reduce((maxIndex, currentItem, currentIndex) => 
-                    parseFloat(currentItem.similarity) > parseFloat(comparisonData[maxIndex].similarity) 
-                      ? currentIndex 
-                      : maxIndex, 0);
-                  
-                  const bestMatch = comparisonData[maxSimilarityIndex];
-                  const sourceImageName = typeof bestMatch.sourceImage === 'string' 
-                    ? bestMatch.sourceImage.split('/').pop() 
-                    : `unum${maxSimilarityIndex + 1}.png`;
-
-                  // N'afficher que si la similitude est significative (par exemple > 50%)
-                  if (parseFloat(bestMatch.similarity) > 50) {
-                    return (
-                      <div>
-                        <h2 className="text-xl font-bold mb-4">Meilleure Correspondance</h2>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p>Correspondance trouvée : {bestMatch.correspondance > 0 ? 'Oui' : 'Non'}</p>
-                            <p>Correspondance préférée : {sourceImageName}</p>
-                            <p>Confiance : {bestMatch.similarity}%</p>
-                            <p>Motifs détectés : {bestMatch.correspondance}</p>
-                            <p>Caractéristiques communes : {bestMatch.correspondance}</p>
-                          </div>
-                          {bestMatch.similarity > 0 && (
-                            <div className="flex items-center justify-center">
-                              <a 
-                                href={`https://mon-porte-clef.unum-solum.com/register/65N8S9Q2LC/${sourceImageName}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                              >
-                                Voir le détail
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // Retourner null si aucune correspondance significative
-                  return null;
-                })()}
-              </div>
-            )}
-            {/* Reste du contenu existant */}
             {isLoading && (
               <div className="text-white text-center">
                 <p>Initialisation du service de détection...</p>
                 <div className="mt-2">
                   <Scan className="w-6 h-6 animate-spin mx-auto" />
                 </div>
-              </div>
-            )}
-            {analysisResults && (
-              <div className="space-y-4">
-                <div className="space-y-2 text-white">
-                  <div className="flex items-center justify-between">
-                    <span>Correspondance trouvée:</span>
-                    <span className={analysisResults.matchFound ? "text-green-400" : "text-red-400"}>
-                      {analysisResults.matchFound ? "Oui" : "Non"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Confiance:</span>
-                    <span>{analysisResults.confidence}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Motifs détectés:</span>
-                    <span>{analysisResults.detectedPatterns}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Caractéristiques communes:</span>
-                    <span>{analysisResults.commonFeatures}</span>
-                  </div>
-                  {analysisResults.rectangles && (
-                    <div className="flex items-center justify-between">
-                      <span>Rectangles détectés:</span>
-                      <span className={analysisResults.rectangles.found ? "text-green-400" : "text-red-400"}>
-                        {analysisResults.rectangles.count}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Image capturée avec rectangles */}
-                {capturedImage && (
-                  <div className="mt-4">
-                    <p className="text-white mb-2 text-sm">Image capturée :</p>
-                    <div className="rounded-lg overflow-hidden border-2 border-primary-lighter relative">
-                      <img 
-                        src={capturedImage} 
-                        alt="Capture" 
-                        className="w-full h-auto"
-                      />
-                      {analysisResults.rectangles?.coordinates.map((rect, index) => (
-                        <svg
-                          key={index}
-                          className="absolute top-0 left-0 w-full h-full"
-                          style={{ pointerEvents: 'none' }}
-                        >
-                          <polygon
-                            points={rect.map(p => `${p.x},${p.y}`).join(' ')}
-                            fill="none"
-                            stroke="#00ff00"
-                            strokeWidth="2"
-                          />
-                        </svg>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {comparisonConfidence && (
-              <div className="comparison-results">
-                <h3>Correspondance trouvée</h3>
-                <p>Confiance : {comparisonConfidence.toFixed(2)}%</p>
-                {nftDetails && (
-                  <button onClick={viewNFT} className="nft-button">
-                    Voir le NFT
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -463,114 +384,47 @@ const ObjectDetectionApp = () => {
         {showComparison && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
                onClick={() => setShowComparison(false)}>
-            <div className="bg-white p-6 rounded-lg max-w-4xl w-full relative" onClick={e => e.stopPropagation()}>
+            <div className="bg-primary-light p-6 rounded-lg max-w-sm w-full relative" onClick={e => e.stopPropagation()}>
               <button 
                 onClick={() => setShowComparison(false)} 
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+                className="absolute top-2 right-2 text-white hover:text-gray-200"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
-              <h2 className="text-xl font-bold mb-4">Comparaison d'Images</h2>
-              <div className="max-h-[70vh] overflow-y-auto">
-                <table className="w-[90%] mx-auto border-collapse border border-gray-300">
-                  <thead className="sticky top-0 bg-gray-100 z-10">
-                    <tr>
-                      <th className="border p-2">Image Source</th>
-                      <th className="border p-2">Image Capturée</th>
-                      <th className="border p-2">Image Comparée</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {comparisonData.length > 0 ? (
-                      comparisonData.map((item, index) => {
-                        // Extraire le nom du fichier de manière sécurisée
-                        const sourceImageName = typeof item.sourceImage === 'string' 
-                          ? item.sourceImage.split('/').pop() 
-                          : `unum${index + 1}.png`;
+              {comparisonData.length > 0 ? (() => {
+                const maxSimilarityIndex = comparisonData.reduce((maxIndex, currentItem, currentIndex) => 
+                  parseFloat(currentItem.similarity) > parseFloat(comparisonData[maxIndex].similarity) 
+                    ? currentIndex 
+                    : maxIndex, 0);
+                
+                const bestMatch = comparisonData[maxSimilarityIndex];
+                const sourceImageName = typeof bestMatch.sourceImage === 'string' 
+                  ? bestMatch.sourceImage.split('/').pop() 
+                  : `unum${maxSimilarityIndex + 1}.png`;
 
-                        // Trouver l'index de l'élément avec la plus grande similarité
-                        const maxSimilarityIndex = comparisonData.reduce((maxIndex, currentItem, currentIndex) => 
-                          parseFloat(currentItem.similarity) > parseFloat(comparisonData[maxIndex].similarity) 
-                            ? currentIndex 
-                            : maxIndex, 0);
-
-                        return (
-                          <>
-                            <tr 
-                              key={index} 
-                              className={index === maxSimilarityIndex 
-                                ? 'bg-[#8caa77]' 
-                                : ''}
-                            >
-                              <td className="border p-2 text-center">
-                                <img 
-                                  src={`/images-source/${sourceImageName}`} 
-                                  alt="Source" 
-                                  className="mx-auto max-h-32 max-w-full object-contain"
-                                />
-                              </td>
-                              <td className="border p-2 text-center">
-                                {item.capturedImage && (
-                                  <img 
-                                    src={item.capturedImage} 
-                                    alt="Capturée" 
-                                    className="mx-auto max-h-32 max-w-full object-contain"
-                                  />
-                                )}
-                              </td>
-                              <td className="border p-2 text-center">
-                                {item.comparisonImageDataUrl && (
-                                  <img 
-                                    src={item.comparisonImageDataUrl} 
-                                    alt="Comparaison" 
-                                    className="mx-auto max-h-32 max-w-full object-contain"
-                                  />
-                                )}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td colSpan={3} className={`border p-2 ${index === maxSimilarityIndex ? 'bg-[#8caa77]' : ''}`}>
-                                <div className={`flex flex-col items-start space-y-1 ${index === maxSimilarityIndex ? 'text-white' : ''}`}>
-                                  <div className="flex justify-between w-full items-center">
-                                    <div>
-                                      {index === maxSimilarityIndex && (
-                                        <>
-                                          <p>Correspondance trouvée : {item.correspondance > 0 ? 'Oui' : 'Non'}</p>
-                                          <p>Correspondance préférée : {sourceImageName}</p>
-                                        </>
-                                      )}
-                                      <p>Confiance : {item.similarity}%</p>
-                                      <p>Motifs détectés : {item.correspondance}</p>
-                                      <p>Caractéristiques communes : {item.correspondance}</p>
-                                    </div>
-                                    {index === maxSimilarityIndex && item.similarity > 0 && (
-                                      <a 
-                                        href="https://mon-porte-clef.unum-solum.com/register/65N8S9Q2LC/" 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                                      >
-                                        Voir le détail
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          </>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={3} className="border p-2 text-center">Aucune comparaison trouvée</td>
-                      </tr>
+                return (
+                  <div className="flex flex-col items-center space-y-4 text-white">
+                    <p className="text-xl font-bold">{sourceImageName}</p>
+                    {bestMatch.similarity > 0 && (
+                      <a 
+                        href={`https://mon-porte-clef.unum-solum.com/${keyChainCodes[sourceImageName.replace(/[^0-9]/g, '')] || '65N8S9Q2LC'}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="bg-primary-darker hover:bg-primary text-white font-bold py-3 px-6 rounded-lg w-full text-center"
+                      >
+                        Voir le porte-clef
+                      </a>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                );
+              })() : (
+                <div className="text-white text-center">
+                  Aucune correspondance trouvée
+                </div>
+              )}
             </div>
           </div>
         )}
