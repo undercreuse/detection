@@ -12,9 +12,19 @@ const keyChainCodes = {
   '4': 'V4DHWQK4L9',
   '78': 'SUQBNEXFHN',
   '79': 'DWZPPMZHB5',
+  '80': 'BQ013HQ53O',
+  '81': 'QMI3TTWDZJ',
+  '82': 'CJ8LXNNLHH',
+  '83': 'PWIYVVCBFI',
   '84': 'OVK46SNAJF',
+  '85': 'X9LI5EUVVY',
+  '86': '4DO3JYO4P4',
+  '87': 'H06H985SXQ',
   '88': 'FXW4NBSBNQ'
 };
+
+// URL de l'application pour le QR code
+const appUrl = window.location.href;
 
 const ObjectDetectionApp = () => {
   const [capturedImage, setCapturedImage] = useState(null);
@@ -26,6 +36,7 @@ const ObjectDetectionApp = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const [comparisonData, setComparisonData] = useState([]);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [comparisonConfidence, setComparisonConfidence] = useState(null);
@@ -157,28 +168,17 @@ const ObjectDetectionApp = () => {
       
       if (results && results.matchFound && results.confidence > 50) {
         const sourceImageName = results.fileName.split('/').pop();
+        // Mettre à jour les résultats
         setAnalysisResults({
           ...results,
           sourceImageName
         });
-        
-        // Déclencher automatiquement la comparaison
+
+        // Déclencher la comparaison en arrière-plan
         console.log("Comparaison automatique avec l'image détectée");
         const comparisons = await patternService.compareImages(imageData);
         console.log("Comparaisons reçues:", comparisons);
-        
-        // Forcer la mise à jour synchrone
         setComparisonData(comparisons);
-        console.log("Ouverture du popup...");
-        setShowComparison(true);
-        
-        // Double vérification après un court délai
-        setTimeout(() => {
-          if (!showComparison) {
-            console.log("Ré-essai d'ouverture du popup...");
-            setShowComparison(true);
-          }
-        }, 500);
       } else {
         setAnalysisResults({
           matchFound: false,
@@ -273,17 +273,22 @@ const ObjectDetectionApp = () => {
   const getCropGuideStyle = () => {
     if (!videoSize.width || !videoSize.height) return {};
 
-    // Dimensions basées sur la hauteur pour maintenir le ratio 1:3
-    const width = videoSize.height * 0.267;
-    const height = width * 3;
-    const left = (videoSize.width - width) / 2;
-    const top = (videoSize.height - height) / 2;
+    // Dimensions basées sur la hauteur pour un ratio plus compact
+    const captureWidth = videoSize.height * 0.267; // Largeur réelle de capture
+    
+    // Viseur plus large mais moins haut que la zone de capture
+    const displayWidth = captureWidth * 2.5; // Multiplier la largeur du viseur par 2.5
+    const displayHeight = displayWidth * 1.2; // Ratio 1:1.2 (légèrement plus haut que large)
+    
+    // Centrer le viseur
+    const left = (videoSize.width - displayWidth) / 2;
+    const top = (videoSize.height - displayHeight) / 2;
 
     return {
       left: `${(left / videoSize.width) * 100}%`,
       top: `${(top / videoSize.height) * 100}%`,
-      width: `${(width / videoSize.width) * 100}%`,
-      height: `${(height / videoSize.height) * 100}%`
+      width: `${(displayWidth / videoSize.width) * 100}%`,
+      height: `${(displayHeight / videoSize.height) * 100}%`
     };
   };
 
@@ -369,14 +374,23 @@ const ObjectDetectionApp = () => {
         {/* Zone principale */}
         <div className="h-16 bg-primary-light p-4 overflow-y-auto">
           <div className="space-y-4">
-            {isLoading && (
+            {isLoading ? (
               <div className="text-white text-center">
                 <p>Initialisation du service de détection...</p>
                 <div className="mt-2">
                   <Scan className="w-6 h-6 animate-spin mx-auto" />
                 </div>
               </div>
-            )}
+            ) : analysisResults && analysisResults.matchFound ? (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowResults(true)}
+                  className="bg-primary-darker hover:bg-primary text-white font-bold py-2 px-4 rounded-lg"
+                >
+                  Voir le résultat
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -429,6 +443,49 @@ const ObjectDetectionApp = () => {
           </div>
         )}
         
+        {/* Modal Résultats */}
+        {showResults && analysisResults && analysisResults.matchFound && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white p-6 rounded-lg relative w-full max-w-md">
+              <button 
+                onClick={() => setShowResults(false)} 
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+              <div className="text-center mb-4">
+                <h3 className="font-bold text-lg text-primary">Motif détecté !</h3>
+                <p className="text-sm text-gray-600">{analysisResults.sourceImageName}</p>
+              </div>
+              {(() => {
+                // Extraire le numéro du nom du fichier
+                const fileNumber = analysisResults.sourceImageName.replace(/[^0-9]/g, '');
+                const keyChainCode = keyChainCodes[fileNumber];
+                
+                if (keyChainCode) {
+                  return (
+                    <a 
+                      href={`https://mon-porte-clef.unum-solum.com/${keyChainCode}`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-primary-darker hover:bg-primary text-white font-bold py-3 px-6 rounded-lg w-full text-center block"
+                    >
+                      Voir le porte-clef {fileNumber}
+                    </a>
+                  );
+                } else {
+                  return (
+                    <p className="text-red-500 text-center">Code non trouvé pour l'image {fileNumber}</p>
+                  );
+                }
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Modal QR Code */}
         {showQR && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
