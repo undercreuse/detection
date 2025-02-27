@@ -1,0 +1,50 @@
+{
+  "name": "detection",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": "https://mon-porte-clef.unum-solum.com/app/",
+  "dependencies": {
+    "autoprefixer": "^10.4.20",
+    "axios": "^1.7.9",
+    "cra-template": "1.2.0",
+    "lucide-react": "^0.473.0",
+    "opencv.js": "^1.2.1",
+    "path-browserify": "^1.0.1",
+    "postcss": "^8.5.1",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-scripts": "5.0.1",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^3.4.17"
+  },
+  "scripts": {
+    "start-secure": "HOST=192.168.1.51 HTTPS=true SSL_CRT_FILE=localhost.pem SSL_KEY_FILE=localhost-key.pem react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject",
+    "start": "react-app-rewired start"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "react-app-rewired": "^2.2.1",
+    "serve-index": "^1.9.1"
+  }
+}

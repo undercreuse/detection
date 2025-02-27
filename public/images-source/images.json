@@ -1,0 +1,19 @@
+{
+  "images": [
+    { "id": "1", "path": "/images-source/unum1.png" },
+    { "id": "2", "path": "/images-source/unum2.png" },
+    { "id": "3", "path": "/images-source/unum3.png" },
+    { "id": "4", "path": "/images-source/unum4.png" },
+    { "id": "78", "path": "/images-source/unum78.jpg" },
+    { "id": "79", "path": "/images-source/unum79.jpg" },
+    { "id": "80", "path": "/images-source/unum80.jpg" },
+    { "id": "81", "path": "/images-source/unum81.jpg" },
+    { "id": "82", "path": "/images-source/unum82.jpg" },
+    { "id": "83", "path": "/images-source/unum83.jpg" },
+    { "id": "84", "path": "/images-source/unum84.jpg" },
+    { "id": "85", "path": "/images-source/unum85.jpg" },
+    { "id": "86", "path": "/images-source/unum86.jpg" },
+    { "id": "87", "path": "/images-source/unum87.jpg" },
+    { "id": "88", "path": "/images-source/unum88.jpg" }
+  ]
+}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Application de détection de formes"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Détection de formes</title>
+    <script>
+      // Configuration globale pour OpenCV
+      var Module = {
+        onRuntimeInitialized: function() {
+          console.log('OpenCV Runtime initialisé (index.html)');
+        }
+      };
+    </script>
+    <script 
+      src="%PUBLIC_URL%/opencv/opencv.js" 
+      async 
+      defer
+      onload="console.log('OpenCV.js chargé (index.html)')"
+      onerror="function tryAlternativePath() {
+        console.warn('Tentative de chargement du chemin alternatif pour OpenCV');
+        var script = document.createElement('script');
+        script.src = '%PUBLIC_URL%/opencv.js';
+        script.async = true;
+        script.defer = true;
+        script.onload = function() { console.log('OpenCV.js chargé depuis le chemin alternatif'); };
+        script.onerror = function() { console.error('Echec du chargement d'OpenCV.js depuis les deux chemins'); };
+        document.head.appendChild(script);
+      }; tryAlternativePath();"
+    ></script>
+    <audio id="cameraSound" preload="auto" src="%PUBLIC_URL%/sounds/clic2.mp3"></audio>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>
